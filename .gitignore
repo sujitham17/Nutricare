@@ -1,0 +1,9 @@
+node_modules/
+target/
+dist/
+.env
+*.log
+uploads/
+*.7z
+*.zip
+application.properties
