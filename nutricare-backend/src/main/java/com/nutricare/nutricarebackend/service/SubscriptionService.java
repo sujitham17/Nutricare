@@ -74,36 +74,59 @@ public class SubscriptionService {
     }
 
     public List<SubscriptionPlanResponse> getActivePlans(String email) {
-        if (email == null || email.isBlank()) {
-            return subscriptionPlanRepository.findByActiveTrueOrderByPriceAsc()
-                    .stream()
-                    .map(this::toPlanResponse)
+        log.info("SubscriptionService.getActivePlans entered. Email: {}", email);
+        try {
+            log.info("Database query started: Fetching active subscription plans");
+            List<SubscriptionPlan> plans = subscriptionPlanRepository.findByActiveTrueOrderByPriceAsc();
+            int recordCount = plans == null ? 0 : plans.size();
+            log.info("Database query completed. Record count: {}", recordCount);
+            if (plans == null || plans.isEmpty()) {
+                return List.of();
+            }
+            log.info("DTO mapping started for active subscription plans");
+            return plans.stream()
+                    .map(plan -> {
+                        try {
+                            return toPlanResponse(plan);
+                        } catch (Exception ex) {
+                            log.error("Error mapping subscription plan record id={}: {}", plan.getId(), ex.getMessage(), ex);
+                            return null;
+                        }
+                    })
+                    .filter(java.util.Objects::nonNull)
                     .toList();
-        }
-
-        User user = getAuthenticatedUser(email);
-        if (user.getRole() == Role.ADMIN) {
-            return subscriptionPlanRepository.findByActiveTrueOrderByPriceAsc()
-                    .stream()
-                    .map(this::toPlanResponse)
-                    .toList();
-        }
-
-        if (user.getRole() != Role.USER && user.getRole() != Role.DIETICIAN) {
+        } catch (Exception e) {
+            log.error("Error in getActivePlans. Full exception: ", e);
             return List.of();
         }
-
-        return subscriptionPlanRepository.findByPlanAudienceAndActiveTrueOrderByPriceAsc(user.getRole())
-                .stream()
-                .map(this::toPlanResponse)
-                .toList();
     }
 
     public List<SubscriptionPlanResponse> getAllPlansForAdmin() {
-        return subscriptionPlanRepository.findAll()
-                .stream()
-                .map(this::toPlanResponse)
-                .toList();
+        log.info("SubscriptionService.getAllPlansForAdmin entered");
+        try {
+            log.info("Database query started: Fetching all subscription plans for admin");
+            List<SubscriptionPlan> plans = subscriptionPlanRepository.findAll();
+            int recordCount = plans == null ? 0 : plans.size();
+            log.info("Database query completed. Record count: {}", recordCount);
+            if (plans == null || plans.isEmpty()) {
+                return List.of();
+            }
+            log.info("DTO mapping started for admin subscription plans");
+            return plans.stream()
+                    .map(plan -> {
+                        try {
+                            return toPlanResponse(plan);
+                        } catch (Exception ex) {
+                            log.error("Error mapping subscription plan record id={}: {}", plan.getId(), ex.getMessage(), ex);
+                            return null;
+                        }
+                    })
+                    .filter(java.util.Objects::nonNull)
+                    .toList();
+        } catch (Exception e) {
+            log.error("Error in getAllPlansForAdmin. Full exception: ", e);
+            return List.of();
+        }
     }
 
     public SubscriptionPlanResponse createPlanForAdmin(SubscriptionPlanRequest request) {
@@ -111,16 +134,16 @@ public class SubscriptionService {
         if (planAudience != Role.USER && planAudience != Role.DIETICIAN) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Plans can only be created for USER or DIETICIAN");
         }
-        if (subscriptionPlanRepository.existsByPlanNameAndPlanAudience(request.getPlanName(), planAudience)) {
+        if (subscriptionPlanRepository.existsByNameAndRoleType(request.getName(), planAudience.name())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Subscription plan already exists for this audience");
         }
 
         SubscriptionPlan saved = subscriptionPlanRepository.save(SubscriptionPlan.builder()
-                .planName(request.getPlanName())
-                .planAudience(planAudience)
+                .name(request.getName())
+                .roleType(planAudience.name())
                 .description(request.getDescription())
                 .price(request.getPrice())
-                .durationInDays(request.getDurationInDays())
+                .durationDays(request.getDurationDays())
                 .features(request.getFeatures())
                 .active(request.isActive())
                 .canBookAppointment(bool(request.getCanBookAppointment()))
@@ -152,11 +175,11 @@ public class SubscriptionService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Plans can only be created for USER or DIETICIAN");
         }
 
-        plan.setPlanName(request.getPlanName());
-        plan.setPlanAudience(planAudience);
+        plan.setName(request.getName());
+        plan.setRoleType(planAudience.name());
         plan.setDescription(request.getDescription());
         plan.setPrice(request.getPrice());
-        plan.setDurationInDays(request.getDurationInDays());
+        plan.setDurationDays(request.getDurationDays());
         plan.setFeatures(request.getFeatures());
         plan.setActive(request.isActive());
         plan.setCanBookAppointment(bool(request.getCanBookAppointment()));
@@ -220,7 +243,7 @@ public class SubscriptionService {
                 .filter(SubscriptionPlan::isActive)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Plan not found"));
 
-        if (plan.getPlanAudience() != user.getRole()) {
+        if (plan.getRoleType() == null || !plan.getRoleType().equalsIgnoreCase(user.getRole().name())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Subscription plan is not available for this role");
         }
 
@@ -275,7 +298,7 @@ public class SubscriptionService {
         }
 
         SubscriptionPlan plan = transaction.getPlan();
-        if (plan.getPlanAudience() != user.getRole()) {
+        if (plan.getRoleType() == null || !plan.getRoleType().equalsIgnoreCase(user.getRole().name())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Subscription plan is not available for this role");
         }
 
@@ -325,7 +348,7 @@ public class SubscriptionService {
         transaction.setRazorpayOrderId(request.getRazorpayOrderId());
         transaction.setRazorpaySignature(request.getRazorpaySignature());
         transaction.setStartDate(startDate);
-        transaction.setEndDate(startDate.plusDays(plan.getDurationInDays()));
+        transaction.setEndDate(startDate.plusDays(plan.getDurationDays()));
         SubscriptionTransaction savedTransaction = saveSubscriptionTransaction(transaction, "ACTIVATE_SUBSCRIPTION");
         billService.createBillForSubscription(savedTransaction);
         user.setSubscriptionActive(true);
@@ -373,7 +396,7 @@ public class SubscriptionService {
 
         SubscriptionPlan plan = subscriptionPlanRepository.findById(request.getPlanId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Subscription plan not found"));
-        if (plan.getPlanAudience() != user.getRole()) {
+        if (plan.getRoleType() == null || !plan.getRoleType().equalsIgnoreCase(user.getRole().name())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Subscription plan is not available for this role");
         }
 
@@ -421,7 +444,7 @@ public class SubscriptionService {
         transaction.setRazorpayOrderId(request.getRazorpayOrderId());
         transaction.setRazorpaySignature(request.getRazorpaySignature());
         transaction.setStartDate(startDate);
-        transaction.setEndDate(startDate.plusDays(plan.getDurationInDays()));
+        transaction.setEndDate(startDate.plusDays(plan.getDurationDays()));
         SubscriptionTransaction savedTransaction = saveSubscriptionTransaction(transaction, "ACTIVATE_SUBSCRIPTION");
         billService.createBillForSubscription(savedTransaction);
 
@@ -452,45 +475,103 @@ public class SubscriptionService {
     }
 
     public FeaturePermissionsResponse getMyFeatures(String email) {
-        User user = getAuthenticatedUser(email);
-        if (user.getRole() == Role.ADMIN) {
+        log.info("SubscriptionService.getMyFeatures entered. Email: {}", email);
+        try {
+            if (email == null) {
+                log.info("Email is null, returning default features");
+                return defaultFeatures(null, null);
+            }
+            log.info("Database query started: Fetching authenticated user");
+            User user = userRepository.findByEmail(email).orElse(null);
+            if (user == null) {
+                log.warn("Authenticated user not found for email: {}, returning default features", email);
+                return defaultFeatures(null, null);
+            }
+            log.info("User found: id={}, role={}", user.getId(), user.getRole());
+            if (user.getRole() == Role.ADMIN) {
+                log.info("DTO mapping started for ADMIN permissions");
+                return FeaturePermissionsResponse.builder()
+                        .userId(user.getId())
+                        .role(user.getRole())
+                        .subscriptionStatus(SubscriptionStatus.ACTIVE)
+                        .canBookAppointment(true)
+                        .canVideoCall(true)
+                        .videoCallLimitMinutes(120)
+                        .canMealLogs(true)
+                        .canFollowUps(true)
+                        .canChat(true)
+                        .canHealthTracking(true)
+                        .build();
+            }
+            log.info("Query started: Fetching active subscription for user: {}", user.getId());
+            UserSubscriptionResponse subscription = getCurrentSubscription(user);
+            log.info("Subscription queried. Active status: {}", subscription != null ? subscription.getStatus() : "None");
+            if (subscription == null || subscription.getStatus() != SubscriptionStatus.ACTIVE) {
+                log.info("No active subscription exists, returning default features");
+                return defaultFeatures(user.getId(), user.getRole());
+            }
+            log.info("DTO mapping started: Mapping active subscription features to response");
             return FeaturePermissionsResponse.builder()
                     .userId(user.getId())
                     .role(user.getRole())
-                    .subscriptionStatus(SubscriptionStatus.ACTIVE)
-                    .canBookAppointment(true)
-                    .canVideoCall(true)
-                    .canMealLogs(true)
-                    .canFollowUps(true)
-                    .canChat(true)
+                    .planId(subscription.getPlanId())
+                    .planName(subscription.getPlanName())
+                    .subscriptionStatus(subscription.getStatus())
+                    .canBookAppointment(subscription.isCanBookAppointment())
+                    .canVideoCall(subscription.isCanVideoCall())
+                    .videoCallLimitMinutes(subscription.getVideoCallLimitMinutes() != null ? subscription.getVideoCallLimitMinutes() : 0)
+                    .canMealLogs(subscription.isCanMealLogs())
+                    .canFollowUps(subscription.isCanFollowUps())
+                    .canChat(subscription.isCanChat())
+                    .allowedUserPlans(subscription.getAllowedUserPlans() != null ? subscription.getAllowedUserPlans() : "")
+                    .maxUsers(subscription.getMaxUsers() != null ? subscription.getMaxUsers() : 0)
+                    .canHealthTracking(true)
                     .build();
+        } catch (Exception e) {
+            log.error("Error in getMyFeatures. Full exception: ", e);
+            try {
+                if (email != null) {
+                    User user = userRepository.findByEmail(email).orElse(null);
+                    if (user != null) {
+                        return defaultFeatures(user.getId(), user.getRole());
+                    }
+                }
+            } catch (Exception ignored) {}
+            return defaultFeatures(null, null);
         }
-        UserSubscriptionResponse subscription = getCurrentSubscription(user);
+    }
+
+    private FeaturePermissionsResponse defaultFeatures(Long userId, Role role) {
         return FeaturePermissionsResponse.builder()
-                .userId(user.getId())
-                .role(user.getRole())
-                .planId(subscription.getPlanId())
-                .planName(subscription.getPlanName())
-                .subscriptionStatus(subscription.getStatus())
-                .canBookAppointment(subscription.isCanBookAppointment())
-                .canVideoCall(subscription.isCanVideoCall())
-                .videoCallLimitMinutes(subscription.getVideoCallLimitMinutes())
-                .canMealLogs(subscription.isCanMealLogs())
-                .canFollowUps(subscription.isCanFollowUps())
-                .canChat(subscription.isCanChat())
-                .allowedUserPlans(subscription.getAllowedUserPlans())
-                .maxUsers(subscription.getMaxUsers())
+                .userId(userId)
+                .role(role)
+                .subscriptionStatus(SubscriptionStatus.INACTIVE)
+                .canBookAppointment(false)
+                .canVideoCall(false)
+                .videoCallLimitMinutes(0)
+                .canMealLogs(false)
+                .canFollowUps(false)
+                .canChat(false)
+                .canHealthTracking(true)
                 .build();
     }
 
     public UserSubscriptionResponse getCurrentSubscription(User user) {
-        return subscriptionTransactionRepository.findByUserAndSubscriptionStatus(user, SubscriptionStatus.ACTIVE)
-                .stream()
-                .filter(this::isCurrent)
-                .filter(subscription -> !subscription.isDeleted())
-                .max(java.util.Comparator.comparing(SubscriptionTransaction::getCreatedAt))
-                .map(this::toSubscriptionResponse)
-                .orElseGet(() -> inactiveSubscription(user));
+        if (user == null) {
+            return inactiveSubscription(null);
+        }
+        try {
+            return subscriptionTransactionRepository.findByUserAndSubscriptionStatus(user, SubscriptionStatus.ACTIVE)
+                    .stream()
+                    .filter(this::isCurrent)
+                    .filter(subscription -> subscription != null && !subscription.isDeleted())
+                    .max(java.util.Comparator.comparing(subscription -> subscription.getCreatedAt() != null ? subscription.getCreatedAt() : java.time.LocalDateTime.MIN))
+                    .map(this::toSubscriptionResponse)
+                    .orElseGet(() -> inactiveSubscription(user));
+        } catch (Exception e) {
+            log.error("Error in getCurrentSubscription for user id={}: {}", user.getId(), e.getMessage(), e);
+            return inactiveSubscription(user);
+        }
     }
 
     public SubscriptionStatus getSubscriptionStatus(User user) {
@@ -814,36 +895,75 @@ public class SubscriptionService {
     }
 
     private SubscriptionPlanResponse toPlanResponse(SubscriptionPlan plan) {
+        if (plan == null) return null;
+        log.info("Mapping SubscriptionPlan to DTO. Plan ID: {}", plan.getId());
+        String rType = plan.getRoleType();
+        Role audience = null;
+        if (rType != null) {
+            try {
+                audience = Role.valueOf(rType.toUpperCase());
+            } catch (Exception e) {
+                audience = Role.USER;
+            }
+        }
+
+        Integer maxAppts = plan.getMaxAppointments();
+        if (maxAppts == null) {
+            maxAppts = (audience == Role.DIETICIAN) ? -1 : 0;
+        }
+
+        Integer maxUsrs = plan.getMaxUsers();
+        if (maxUsrs == null) {
+            maxUsrs = (audience == Role.DIETICIAN) ? -1 : 0;
+        }
+
+        Integer videoCallLimit = plan.getVideoCallLimitMinutes();
+        if (videoCallLimit == null) {
+            videoCallLimit = 0;
+        }
+
         return SubscriptionPlanResponse.builder()
                 .id(plan.getId())
-                .planName(plan.getPlanName())
-                .planAudience(plan.getPlanAudience())
+                .planName(plan.getName())
+                .name(plan.getName())
+                .planAudience(audience)
+                .roleType(plan.getRoleType())
                 .description(plan.getDescription())
                 .price(plan.getPrice())
-                .durationInDays(plan.getDurationInDays())
+                .durationInDays(plan.getDurationDays())
+                .durationDays(plan.getDurationDays())
                 .features(plan.getFeatures())
                 .active(plan.isActive())
-                .canBookAppointment(plan.isCanBookAppointment())
-                .canVideoCall(plan.isCanVideoCall())
-                .videoCallLimitMinutes(plan.getVideoCallLimitMinutes())
-                .canMealLogs(plan.isCanMealLogs())
-                .canFollowUps(plan.isCanFollowUps())
-                .canChat(plan.isCanChat())
-                .allowedUserPlans(plan.getAllowedUserPlans())
-                .maxUsers(plan.getMaxUsers())
-                .maxAppointments(plan.getMaxAppointments())
+                .canBookAppointment(Boolean.TRUE.equals(plan.getCanBookAppointment()))
+                .canVideoCall(Boolean.TRUE.equals(plan.getCanVideoCall()))
+                .videoCallLimitMinutes(videoCallLimit)
+                .canMealLogs(Boolean.TRUE.equals(plan.getCanMealLogs()))
+                .canFollowUps(Boolean.TRUE.equals(plan.getCanFollowUps()))
+                .canChat(Boolean.TRUE.equals(plan.getCanChat()))
+                .allowedUserPlans(plan.getAllowedUserPlans() != null ? plan.getAllowedUserPlans() : "")
+                .maxUsers(maxUsrs)
+                .maxAppointments(maxAppts)
                 .build();
     }
 
     private PaymentTransactionResponse toPaymentResponse(SubscriptionTransaction transaction) {
         SubscriptionPlan plan = transaction.getPlan();
+        String rType = plan.getRoleType();
+        Role audience = null;
+        if (rType != null) {
+            try {
+                audience = Role.valueOf(rType.toUpperCase());
+            } catch (Exception e) {
+                audience = Role.USER;
+            }
+        }
 
         return PaymentTransactionResponse.builder()
                 .id(transaction.getId())
                 .userId(transaction.getUser().getId())
                 .planId(plan.getId())
-                .planName(plan.getPlanName())
-                .planAudience(plan.getPlanAudience())
+                .planName(plan.getName())
+                .planAudience(audience)
                 .amount(transaction.getAmount())
                 .paymentStatus(transaction.getStatus())
                 .paymentStatusText(paymentStatusText(transaction.getStatus()))
@@ -860,30 +980,58 @@ public class SubscriptionService {
 
     private UserSubscriptionResponse toSubscriptionResponse(SubscriptionTransaction subscription) {
         SubscriptionPlan plan = subscription.getPlan();
+        if (plan == null) {
+            return inactiveSubscription(subscription.getUser());
+        }
+        log.info("Mapping SubscriptionTransaction to DTO. Plan ID: {}", plan.getId());
+        String rType = plan.getRoleType();
+        Role audience = null;
+        if (rType != null) {
+            try {
+                audience = Role.valueOf(rType.toUpperCase());
+            } catch (Exception e) {
+                audience = Role.USER;
+            }
+        }
+
+        Integer maxAppts = plan.getMaxAppointments();
+        if (maxAppts == null) {
+            maxAppts = (audience == Role.DIETICIAN) ? -1 : 0;
+        }
+
+        Integer maxUsrs = plan.getMaxUsers();
+        if (maxUsrs == null) {
+            maxUsrs = (audience == Role.DIETICIAN) ? -1 : 0;
+        }
+
+        Integer videoCallLimit = plan.getVideoCallLimitMinutes();
+        if (videoCallLimit == null) {
+            videoCallLimit = 0;
+        }
 
         return UserSubscriptionResponse.builder()
                 .id(subscription.getId())
                 .userId(subscription.getUser().getId())
                 .planId(plan.getId())
-                .planName(plan.getPlanName())
-                .planAudience(plan.getPlanAudience())
+                .planName(plan.getName())
+                .planAudience(audience)
                 .planDescription(plan.getDescription())
                 .price(plan.getPrice())
-                .durationInDays(plan.getDurationInDays())
+                .durationInDays(plan.getDurationDays())
                 .features(plan.getFeatures())
                 .status(subscription.getSubscriptionStatus())
                 .startDate(subscription.getStartDate())
                 .endDate(subscription.getEndDate())
                 .createdAt(subscription.getCreatedAt())
-                .canBookAppointment(plan.isCanBookAppointment())
-                .canVideoCall(plan.isCanVideoCall())
-                .videoCallLimitMinutes(plan.getVideoCallLimitMinutes())
-                .canMealLogs(plan.isCanMealLogs())
-                .canFollowUps(plan.isCanFollowUps())
-                .canChat(plan.isCanChat())
-                .allowedUserPlans(plan.getAllowedUserPlans())
-                .maxUsers(plan.getMaxUsers())
-                .maxAppointments(plan.getMaxAppointments())
+                .canBookAppointment(Boolean.TRUE.equals(plan.getCanBookAppointment()))
+                .canVideoCall(Boolean.TRUE.equals(plan.getCanVideoCall()))
+                .videoCallLimitMinutes(videoCallLimit)
+                .canMealLogs(Boolean.TRUE.equals(plan.getCanMealLogs()))
+                .canFollowUps(Boolean.TRUE.equals(plan.getCanFollowUps()))
+                .canChat(Boolean.TRUE.equals(plan.getCanChat()))
+                .allowedUserPlans(plan.getAllowedUserPlans() != null ? plan.getAllowedUserPlans() : "")
+                .maxUsers(maxUsrs)
+                .maxAppointments(maxAppts)
                 .build();
     }
 

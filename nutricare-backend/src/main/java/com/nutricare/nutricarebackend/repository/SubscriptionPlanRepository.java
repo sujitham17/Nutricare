@@ -1,7 +1,6 @@
 package com.nutricare.nutricarebackend.repository;
 
 import com.nutricare.nutricarebackend.entity.SubscriptionPlan;
-import com.nutricare.nutricarebackend.entity.Role;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -11,9 +10,9 @@ public interface SubscriptionPlanRepository extends JpaRepository<SubscriptionPl
 
     List<SubscriptionPlan> findByActiveTrueOrderByPriceAsc();
 
-    List<SubscriptionPlan> findByPlanAudienceAndActiveTrueOrderByPriceAsc(Role planAudience);
+    List<SubscriptionPlan> findByRoleTypeAndActiveTrueOrderByPriceAsc(String roleType);
 
-    Optional<SubscriptionPlan> findByPlanNameAndPlanAudience(String planName, Role planAudience);
+    Optional<SubscriptionPlan> findByNameAndRoleType(String name, String roleType);
 
-    boolean existsByPlanNameAndPlanAudience(String planName, Role planAudience);
+    boolean existsByNameAndRoleType(String name, String roleType);
 }

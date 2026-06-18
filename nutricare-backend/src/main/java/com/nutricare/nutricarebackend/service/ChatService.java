@@ -53,6 +53,7 @@ public class ChatService {
             userRepository.findByRoleOrderByCreatedAtDesc(Role.ADMIN)
                     .stream()
                     .filter(this::isChatAvailable)
+                    .filter(contact -> !contact.getEmail().equalsIgnoreCase("admin@nutricare.com"))
                     .forEach(contact -> contacts.putIfAbsent(contact.getId(), contact));
         } else if (current.getRole() == Role.DIETICIAN) {
             appointmentRepository.findByDieticianOrderByAppointmentDateDescAppointmentTimeDesc(current)
@@ -63,6 +64,7 @@ public class ChatService {
             userRepository.findByRoleOrderByCreatedAtDesc(Role.ADMIN)
                     .stream()
                     .filter(this::isChatAvailable)
+                    .filter(contact -> !contact.getEmail().equalsIgnoreCase("admin@nutricare.com"))
                     .forEach(contact -> contacts.putIfAbsent(contact.getId(), contact));
         } else if (current.getRole() == Role.ADMIN) {
             userRepository.findByRoleInOrderByCreatedAtDesc(List.of(Role.USER, Role.DIETICIAN))
@@ -273,6 +275,9 @@ public class ChatService {
             return false;
         }
         User contact = getConversationContact(current, conversation);
+        if (contact != null && contact.getEmail().equalsIgnoreCase("admin@nutricare.com")) {
+            return false;
+        }
         return isChatAvailable(contact) && isAllowedContact(current, contact);
     }
 
@@ -285,6 +290,9 @@ public class ChatService {
     private void requireAllowedContact(User current, User contact) {
         requireChatAvailable(current);
         requireChatAvailable(contact);
+        if (current.getEmail().equalsIgnoreCase("admin@nutricare.com") || contact.getEmail().equalsIgnoreCase("admin@nutricare.com")) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This chat contact is not allowed");
+        }
         if (current.getId().equals(contact.getId()) || !isAllowedContact(current, contact)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This chat contact is not allowed");
         }

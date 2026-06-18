@@ -18,10 +18,13 @@ public class SubscriptionPlanResponse {
 
     private Long id;
     private String planName;
+    private String name;
     private Role planAudience;
+    private String roleType;
     private String description;
     private BigDecimal price;
     private Integer durationInDays;
+    private Integer durationDays;
     private String features;
     private boolean active;
     private boolean canBookAppointment;

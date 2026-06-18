@@ -42,6 +42,41 @@ public class DefaultSubscriptionPlanSeeder implements ApplicationRunner {
                 true, true, null, true, true, true, "Basic,Premium,Pro", null, -1);
         deactivateNonRequiredPlans(Role.USER);
         deactivateNonRequiredPlans(Role.DIETICIAN);
+
+        // Update any existing plans in the database to 90 days, and adjust user/dietician max appointments
+        subscriptionPlanRepository.findAll().forEach(plan -> {
+            boolean changed = false;
+            if (plan.getDurationDays() == null || plan.getDurationDays() != 90) {
+                plan.setDurationDays(90);
+                changed = true;
+            }
+            if (Role.USER.name().equalsIgnoreCase(plan.getRoleType())) {
+                if (plan.getMaxAppointments() != null) {
+                    plan.setMaxAppointments(null);
+                    changed = true;
+                }
+            } else if (Role.DIETICIAN.name().equalsIgnoreCase(plan.getRoleType())) {
+                if ("Starter".equalsIgnoreCase(plan.getName())) {
+                    if (plan.getMaxAppointments() == null || plan.getMaxAppointments() != 5) {
+                        plan.setMaxAppointments(5);
+                        changed = true;
+                    }
+                } else if ("Professional".equalsIgnoreCase(plan.getName())) {
+                    if (plan.getMaxAppointments() == null || plan.getMaxAppointments() != 10) {
+                        plan.setMaxAppointments(10);
+                        changed = true;
+                    }
+                } else if ("Enterprise".equalsIgnoreCase(plan.getName())) {
+                    if (plan.getMaxAppointments() == null || plan.getMaxAppointments() != -1) {
+                        plan.setMaxAppointments(-1);
+                        changed = true;
+                    }
+                }
+            }
+            if (changed) {
+                subscriptionPlanRepository.save(plan);
+            }
+        });
     }
 
     private void seed(
@@ -60,14 +95,14 @@ public class DefaultSubscriptionPlanSeeder implements ApplicationRunner {
             Integer maxUsers,
             Integer maxAppointments
     ) {
-        SubscriptionPlan plan = subscriptionPlanRepository.findByPlanNameAndPlanAudience(name, audience)
+        SubscriptionPlan plan = subscriptionPlanRepository.findByNameAndRoleType(name, audience.name())
                 .orElseGet(SubscriptionPlan::new);
 
-        plan.setPlanName(name);
-        plan.setPlanAudience(audience);
+        plan.setName(name);
+        plan.setRoleType(audience.name());
         plan.setDescription(description);
         plan.setPrice(new BigDecimal(price));
-        plan.setDurationInDays(30);
+        plan.setDurationDays(90);
         plan.setFeatures(features);
         plan.setActive(true);
         plan.setCanBookAppointment(canBookAppointment);
@@ -85,9 +120,9 @@ public class DefaultSubscriptionPlanSeeder implements ApplicationRunner {
 
     private void deactivateNonRequiredPlans(Role audience) {
         Set<String> requiredNames = REQUIRED_PLANS.get(audience);
-        subscriptionPlanRepository.findByPlanAudienceAndActiveTrueOrderByPriceAsc(audience)
+        subscriptionPlanRepository.findByRoleTypeAndActiveTrueOrderByPriceAsc(audience.name())
                 .stream()
-                .filter(plan -> !requiredNames.contains(plan.getPlanName()))
+                .filter(plan -> !requiredNames.contains(plan.getName()))
                 .forEach(plan -> {
                     plan.setActive(false);
                     subscriptionPlanRepository.save(plan);

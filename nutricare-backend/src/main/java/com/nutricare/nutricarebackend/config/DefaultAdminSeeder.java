@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class DefaultAdminSeeder implements ApplicationRunner {
 
-    private static final String ADMIN_EMAIL = "admin@nutricare.com";
+    private static final String ADMIN_EMAIL = "nutricareadmin@gmail.com";
     private static final String ADMIN_PASSWORD = "1234";
 
     private final UserRepository userRepository;

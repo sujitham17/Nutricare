@@ -28,4 +28,6 @@ public class FeaturePermissionsResponse {
     private boolean canChat;
     private String allowedUserPlans;
     private Integer maxUsers;
+    @Builder.Default
+    private boolean canHealthTracking = true;
 }

@@ -27,13 +27,13 @@ public class Disease {
     @Column(columnDefinition = "TEXT")
     private String symptoms;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "recommendedFoods", columnDefinition = "TEXT")
     private String recommendedFoods;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "foodsToAvoid", columnDefinition = "TEXT")
     private String foodsToAvoid;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "nutritionTips", columnDefinition = "TEXT")
     private String nutritionTips;
 
     @Builder.Default
@@ -55,9 +55,10 @@ public class Disease {
     @Column(length = 1000)
     private String description;
 
-    @Column(nullable = false, updatable = false, columnDefinition = "datetime(6) default current_timestamp(6)")
+    @Column(name = "createdAt", nullable = false, updatable = false, columnDefinition = "datetime(6) default current_timestamp(6)")
     private LocalDateTime createdAt;
 
+    @Column(name = "updatedAt")
     private LocalDateTime updatedAt;
 
     @PrePersist

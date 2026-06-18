@@ -9,10 +9,12 @@ import com.nutricare.nutricarebackend.dto.SubscriptionPlanRequest;
 import com.nutricare.nutricarebackend.dto.SubscriptionPlanResponse;
 import com.nutricare.nutricarebackend.dto.UserSubscriptionResponse;
 import com.nutricare.nutricarebackend.service.SubscriptionService;
+import com.nutricare.nutricarebackend.entity.SubscriptionStatus;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,10 +35,19 @@ public class SubscriptionController {
 
     private final SubscriptionService subscriptionService;
 
-    @GetMapping("/api/subscription-plans")
+    @GetMapping(value = "/api/subscription-plans", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<List<SubscriptionPlanResponse>> getSubscriptionPlans(Authentication authentication) {
         String email = authentication == null ? null : authentication.getName();
-        return ResponseEntity.ok(subscriptionService.getActivePlans(email));
+        log.info("Entering getSubscriptionPlans. Authenticated user: {}", email != null ? email : "Anonymous");
+        try {
+            log.info("Query started: Fetching active subscription plans");
+            List<SubscriptionPlanResponse> plans = subscriptionService.getActivePlans(email);
+            log.info("Query completed. Record count: {}", plans.size());
+            return ResponseEntity.ok(plans);
+        } catch (Exception e) {
+            log.error("Exception fetching active subscription plans: {}", e.getMessage(), e);
+            return ResponseEntity.ok(List.of());
+        }
     }
 
     @GetMapping("/api/admin/subscription-plans")
@@ -100,13 +111,49 @@ public class SubscriptionController {
         return ResponseEntity.ok(subscriptionService.confirmSubscription(authentication.getName(), request));
     }
 
-    @GetMapping("/api/subscriptions/my")
+    @GetMapping(value = "/api/subscriptions/my", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<UserSubscriptionResponse> getMySubscription(Authentication authentication) {
-        return ResponseEntity.ok(subscriptionService.getMySubscription(authentication.getName()));
+        String email = authentication == null ? null : authentication.getName();
+        log.info("Entering getMySubscription. Authenticated user: {}", email != null ? email : "Anonymous");
+        try {
+            if (email == null) {
+                return ResponseEntity.ok(UserSubscriptionResponse.builder()
+                        .status(com.nutricare.nutricarebackend.entity.SubscriptionStatus.INACTIVE)
+                        .build());
+            }
+            log.info("Query started: Fetching current subscription for user: {}", email);
+            UserSubscriptionResponse sub = subscriptionService.getMySubscription(email);
+            log.info("Query completed for getMySubscription. Subscription status: {}", sub != null ? sub.getStatus() : "None");
+            return ResponseEntity.ok(sub);
+        } catch (Exception e) {
+            log.error("Exception in getMySubscription: {}", e.getMessage(), e);
+            return ResponseEntity.ok(UserSubscriptionResponse.builder()
+                    .status(com.nutricare.nutricarebackend.entity.SubscriptionStatus.INACTIVE)
+                    .build());
+        }
     }
 
-    @GetMapping("/api/subscriptions/my-features")
+    @GetMapping(value = "/api/subscriptions/my-features", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<FeaturePermissionsResponse> getMyFeatures(Authentication authentication) {
-        return ResponseEntity.ok(subscriptionService.getMyFeatures(authentication.getName()));
+        String email = authentication == null ? null : authentication.getName();
+        log.info("Entering getMyFeatures. Authenticated user: {}", email != null ? email : "Anonymous");
+        try {
+            log.info("Query started: Fetching features/permissions for user: {}", email);
+            FeaturePermissionsResponse response = subscriptionService.getMyFeatures(email);
+            log.info("Query completed for getMyFeatures.");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Exception in getMyFeatures: {}", e.getMessage(), e);
+            return ResponseEntity.ok(FeaturePermissionsResponse.builder()
+                    .subscriptionStatus(com.nutricare.nutricarebackend.entity.SubscriptionStatus.INACTIVE)
+                    .canBookAppointment(false)
+                    .canVideoCall(false)
+                    .videoCallLimitMinutes(0)
+                    .canMealLogs(false)
+                    .canFollowUps(false)
+                    .canChat(false)
+                    .canHealthTracking(true)
+                    .build());
+        }
     }
 }

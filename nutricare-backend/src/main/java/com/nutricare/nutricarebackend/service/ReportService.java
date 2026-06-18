@@ -93,6 +93,7 @@ public class ReportService {
                         .reduce(BigDecimal.ZERO, BigDecimal::add))
                 .overallCompliancePercent(0)
                 .appointmentCounts(appointments.stream()
+                        .filter(appointment -> appointment != null && appointment.getStatus() != null)
                         .collect(Collectors.groupingBy(appointment -> appointment.getStatus().name(), Collectors.counting())))
                 .build();
     }
@@ -165,6 +166,7 @@ public class ReportService {
                         .reduce(BigDecimal.ZERO, BigDecimal::add))
                 .overallCompliancePercent(mealComplianceService.getOverallCompliancePercent(user, dietician))
                 .appointmentCounts(appointments.stream()
+                        .filter(appointment -> appointment != null && appointment.getStatus() != null)
                         .collect(Collectors.groupingBy(appointment -> appointment.getStatus().name(), Collectors.counting())))
                 .build();
     }

@@ -131,8 +131,8 @@ public class PdfGenerationService {
             addTableHeader(itemsTable, "Amount (INR)", boldFont);
 
             // Row for subscription
-            String descText = "Platform Subscription - " + transaction.getPlan().getPlanName() + " Plan" +
-                    "\nDuration: " + transaction.getPlan().getDurationInDays() + " days (" +
+            String descText = "Platform Subscription - " + transaction.getPlan().getName() + " Plan" +
+                    "\nDuration: " + transaction.getPlan().getDurationDays() + " days (" +
                     transaction.getStartDate() + " to " + transaction.getEndDate() + ")";
             addTableCell(itemsTable, descText, normalFont, Element.ALIGN_LEFT);
             addTableCell(itemsTable, "1", normalFont, Element.ALIGN_CENTER);

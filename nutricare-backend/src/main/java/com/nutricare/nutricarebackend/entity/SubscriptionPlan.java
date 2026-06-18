@@ -2,8 +2,6 @@ package com.nutricare.nutricarebackend.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -31,56 +29,51 @@ public class SubscriptionPlan {
     private Long id;
 
     @Column(nullable = false)
-    private String planName;
-
-    @Builder.Default
-    @Column(nullable = false, columnDefinition = "varchar(20) default 'USER'")
-    @Enumerated(EnumType.STRING)
-    private Role planAudience = Role.USER;
+    private boolean active;
 
     @Lob
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal price;
-
-    @Column(nullable = false)
-    private Integer durationInDays;
-
     @Lob
     @Column(columnDefinition = "TEXT")
     private String features;
 
-    @Column(nullable = false)
-    private boolean active;
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal price;
 
-    @Builder.Default
-    @Column(nullable = false, columnDefinition = "bit default 0")
-    private boolean canBookAppointment = false;
+    @Column(name = "planName")
+    private String name;
 
-    @Builder.Default
-    @Column(nullable = false, columnDefinition = "bit default 0")
-    private boolean canVideoCall = false;
+    @Column(name = "planAudience")
+    private String roleType;
 
-    private Integer videoCallLimitMinutes;
+    @Column(name = "duration")
+    private Integer durationDays;
 
-    @Builder.Default
-    @Column(nullable = false, columnDefinition = "bit default 0")
-    private boolean canMealLogs = false;
-
-    @Builder.Default
-    @Column(nullable = false, columnDefinition = "bit default 0")
-    private boolean canFollowUps = false;
-
-    @Builder.Default
-    @Column(nullable = false, columnDefinition = "bit default 0")
-    private boolean canChat = false;
-
-    @Column(length = 500)
+    @Column(name = "allowed_user_plans")
     private String allowedUserPlans;
 
+    @Column(name = "can_book_appointment")
+    private Boolean canBookAppointment;
+
+    @Column(name = "can_chat")
+    private Boolean canChat;
+
+    @Column(name = "can_follow_ups")
+    private Boolean canFollowUps;
+
+    @Column(name = "can_meal_logs")
+    private Boolean canMealLogs;
+
+    @Column(name = "can_video_call")
+    private Boolean canVideoCall;
+
+    @Column(name = "max_users")
     private Integer maxUsers;
+
+    @Column(name = "video_call_limit_minutes")
+    private Integer videoCallLimitMinutes;
 
     @Column(name = "max_appointments")
     private Integer maxAppointments;
